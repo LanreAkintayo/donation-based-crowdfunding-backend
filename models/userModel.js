@@ -22,6 +22,14 @@ const userSchema = new mongoose.Schema({
     type: String,
     required: true, // Note: This will store the password hash, not the plaintext password.
   },
+  subaccountCode: {
+    type: String,
+    trim: true,
+    default: null,
+  },
+  bankName: String,
+  accountNumber: String,
+
   createdAt: {
     type: Date,
     default: Date.now,
