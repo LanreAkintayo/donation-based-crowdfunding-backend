@@ -2,9 +2,7 @@ const express = require("express");
 const router = express.Router();
 const bcrypt = require("bcrypt");
 const jwt = require("jsonwebtoken");
-// const User = require("../models/User");
-const User = require("../models/userModel"); // Import the User model
-
+const User = require("../models/userModel"); 
 
 // @route   POST /api/auth/login
 // @desc    Authenticate user & get token
@@ -32,11 +30,9 @@ router.post("/login", async (req, res) => {
       return res.status(400).json({ message: "Invalid credentials" });
     }
 
-    // Important: Create JWT payload
+    // Create JWT payload
     const payload = {
-      user: {
-        id: user._id,
-      },
+      id: user._id, 
     };
 
     // Sign and return the token

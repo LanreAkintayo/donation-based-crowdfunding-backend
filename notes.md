@@ -1,0 +1,3 @@
+So, basically, when trying to log in, it goes through authRoutes.js and a JWT token is created and sent to the client. Now, if that user wants to call one of the protected APIs, the request first hits the Route. The route then passes the request to the Middleware to be validated. If validation is successful, it finally gets access to the Controller."
+
+That's the correct Route -> Middleware -> Controller flow.

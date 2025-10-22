@@ -1,12 +1,14 @@
-const axios = require('axios');
-const User = require('../models/userModel'); 
+const axios = require("axios");
+const User = require("../models/userModel");
+const Campaign = require("../models/campaignModel");
+const Donation = require("../models/donationModel");
 
 const paystackApi = axios.create({
-    baseURL: 'https://api.paystack.co',
-    headers: {
-        Authorization: `Bearer ${process.env.PAYSTACK_SECRET_KEY}`,
-        'Content-Type': 'application/json',
-    },
+  baseURL: "https://api.paystack.co",
+  headers: {
+    Authorization: `Bearer ${process.env.PAYSTACK_SECRET_KEY}`,
+    "Content-Type": "application/json",
+  },
 });
 
 /**
@@ -15,38 +17,41 @@ const paystackApi = axios.create({
  * @access  Private (only logged-in users)
  */
 exports.createSubaccount = async (req, res) => {
-    try {
-        const { businessName, bankCode, accountNumber } = req.body;
+  try {
+    const { businessName, bankCode, accountNumber } = req.body;
 
-        // Get the logged-in user's ID
-        const userId = req.user.id;
+    // Get the logged-in user's ID
+    const userId = req.user.id;
 
-        // Call Paystack to create the subaccount
-        const response = await paystackApi.post('/subaccount', {
-            business_name: businessName,
-            bank_code: bankCode,
-            account_number: accountNumber,
-            // 'manual' holds all funds until a payout is triggered.
-            settlement_schedule: 'manual', 
-            // This is your platform fee.
-            percentage_charge: 0,
-        });
+    // Call Paystack to create the subaccount
+    const response = await paystackApi.post("/subaccount", {
+      business_name: businessName,
+      bank_code: bankCode,
+      account_number: accountNumber,
+      settlement_schedule: "manual", // 'manual' holds all funds until a payout is triggered.
+      percentage_charge: 0, // This is the platform fee.
+    });
 
-        const { subaccount_code } = response.data.data;
+    const { subaccount_code } = response.data.data;
 
-        // Save the new subaccount code to the user's record in your database
-        await User.findByIdAndUpdate(userId, { subaccountCode: subaccount_code });
+    // Save the new subaccount code to the user's record in your database
+    await User.findByIdAndUpdate(userId, { subaccountCode: subaccount_code });
 
-        res.status(201).json({
-            status: 'success',
-            message: 'Subaccount created successfully.',
-            data: response.data.data,
-        });
-
-    } catch (error) {
-        console.error('Error creating subaccount:', error.response?.data || error.message);
-        res.status(500).json({ status: 'error', message: 'An error occurred while creating the subaccount.' });
-    }
+    res.status(201).json({
+      status: "success",
+      message: "Subaccount created successfully.",
+      data: response.data.data,
+    });
+  } catch (error) {
+    console.error(
+      "Error creating subaccount:",
+      error.response?.data || error.message
+    );
+    res.status(500).json({
+      status: "error",
+      message: "An error occurred while creating the subaccount.",
+    });
+  }
 };
 
 /**
@@ -55,35 +60,78 @@ exports.createSubaccount = async (req, res) => {
  * @access  Public
  */
 exports.verifyTransaction = async (req, res) => {
-    try {
-        const { reference } = req.params;
-        const response = await paystackApi.get(`/transaction/verify/${reference}`);
-        const { status, amount, customer, metadata } = response.data.data;
+  try {
+    const { reference } = req.params;
+    const response = await paystackApi.get(`/transaction/verify/${reference}`);
+    const { status, amount, customer, metadata } = response.data.data;
+    const { campaignId, isAnonymous } = metadata;
 
-        // Check if the transaction was successful
-        if (status !== 'success') {
-            return res.status(400).json({ status: 'error', message: 'Transaction was not successful.' });
-        }
-
-        // Transaction is verified! Now, the business logic.
-        // For example:
-        // - Find the campaign the donation was for (you could pass campaignId in metadata)
-        // - Create a new "Donation" record in your database
-        // - Update the campaign's total amount raised
-        // - Send a thank you email to the donor
-        console.log(`Donation of ${amount / 100} NGN by ${customer.email} verified successfully.`);
-        
-        res.status(200).json({
-            status: 'success',
-            message: 'Transaction has been verified successfully.',
-        });
-
-    } catch (error) {
-        console.error('Error verifying transaction:', error.response?.data || error.message);
-        res.status(500).json({ status: 'error', message: 'An error occurred during transaction verification.' });
+    // Check if the transaction was successful
+    if (status !== "success") {
+      return res
+        .status(400)
+        .json({ status: "error", message: "Transaction was not successful." });
     }
-};
 
+    // Check if this donation has already been verified and recorded
+    const existingDonation = await Donation.findOne({
+      paystackReference: reference,
+    });
+    if (existingDonation) {
+      return res.status(200).json({
+        status: "success",
+        message: "Transaction has already been verified.",
+      });
+    }
+
+    // Check the campaign id from the metadata
+    if (!campaignId) {
+      // The frontend did not send the campaignId
+      console.error(
+        "Error: CampaignId not found in metadata for reference",
+        reference
+      );
+      return res.status(400).json({
+        status: "error",
+        message: "CampaignId not found in metadata.",
+      });
+    }
+
+    // Create the donation record
+    await Donation.create({
+      campaign: campaignId,
+      donorEmail: customer.email,
+      amount: amount, // Amount is already in Kobo from paystack
+      paystackReference: reference,
+      isAnonymous: isAnonymous,
+    });
+
+    // Update the campaigns' total amount raised
+    await Campaign.findByIdAndUpdate(campaignId, {
+      $inc: { amountRaised: amount },
+    });
+
+    console.log(
+      `Donation of ${amount / 100} NGN by ${
+        customer.email
+      } verified and recorded.`
+    );
+
+    res.status(200).json({
+      status: "success",
+      message: "Transaction has been verified successfully.",
+    });
+  } catch (error) {
+    console.error(
+      "Error verifying transaction:",
+      error.response?.data || error.message
+    );
+    res.status(500).json({
+      status: "error",
+      message: "An error occurred during transaction verification.",
+    });
+  }
+};
 
 /**
  * @desc    Trigger a payout to a campaign creator
@@ -91,27 +139,61 @@ exports.verifyTransaction = async (req, res) => {
  * @access  Private
  */
 exports.triggerPayout = async (req, res) => {
-    try {
-        const userId = req.user.id;
-        const user = await User.findById(userId);
+  try {
+    const userId = req.user.id;
+    const user = await User.findById(userId);
 
-        if (!user || !user.subaccountCode) {
-            return res.status(400).json({ status: 'error', message: 'User has no subaccount configured for payout.' });
-        }
-
-        // To trigger a payout, we simply update the subaccount's settlement schedule to daily.
-        // Paystack will then process all accumulated funds in the next settlement window.
-        await paystackApi.put(`/subaccount/${user.subaccountCode}`, {
-            settlement_schedule: 'daily',
-        });
-        
-        res.status(200).json({
-            status: 'success',
-            message: 'Payout has been initiated. Funds will be settled to your account shortly.',
-        });
-
-    } catch (error) {
-        console.error('Error triggering payout:', error.response?.data || error.message);
-        res.status(500).json({ status: 'error', message: 'An error occurred while initiating the payout.' });
+    if (!user || !user.subaccountCode) {
+      return res.status(400).json({
+        status: "error",
+        message: "User has no subaccount configured for payout.",
+      });
     }
+
+    // To trigger a payout, we simply update the subaccount's settlement schedule to daily.
+    // Paystack will then process all accumulated funds in the next settlement window.
+    await paystackApi.put(`/subaccount/${user.subaccountCode}`, {
+      settlement_schedule: "daily",
+    });
+
+    res.status(200).json({
+      status: "success",
+      message:
+        "Payout has been initiated. Funds will be settled to your account shortly.",
+    });
+  } catch (error) {
+    console.error(
+      "Error triggering payout:",
+      error.response?.data || error.message
+    );
+    res.status(500).json({
+      status: "error",
+      message: "An error occurred while initiating the payout.",
+    });
+  }
+};
+
+exports.getBankList = async (req, res) => {
+  try {
+    const response = await axios.get("https://api.paystack.co/bank");
+    res.status(200).json(response.data.data);
+  } catch (error) {
+    res.status(500).json({ status: "error", message: "Could not fetch banks" });
+  }
+};
+
+
+exports.resolveAccount = async (req, res) => {
+  try {
+    const { accountNumber, bankCode } = req.body;
+
+    // Use the global paystackApi instance you already have
+    const response = await paystackApi.get(
+      `/bank/resolve?account_number=${accountNumber}&bank_code=${bankCode}`
+    );
+
+    res.status(200).json(response.data);
+  } catch (error) {
+    res.status(400).json({ status: 'error', message: 'Account details could not be resolved.' });
+  }
 };

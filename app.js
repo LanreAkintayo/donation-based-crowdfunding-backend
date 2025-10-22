@@ -1,64 +1,66 @@
-// Import all required modules
-var createError = require("http-errors"); // Helps create error objects (like 404, 500)
-var express = require("express"); // Main Express framework
-var path = require("path"); // Node.js module for working with file paths
-var cookieParser = require("cookie-parser"); // For parsing cookies
-var logger = require("morgan"); // Logs HTTP requests in the console
+// Load environment variables from .env file
+require('dotenv').config();
 
-// Import route files
-var bookRouter = require("./routes/bookRoutes");
-var productRouter = require("./routes/productRoutes");
-var userRouter = require("./routes/userRoutes");
-var usersRouter = require("./routes/users");
-var authRouter = require("./routes/authRoutes");
+const createError = require('http-errors');
+const express = require('express');
+const path = require('path');
+const cookieParser = require('cookie-parser');
+const logger = require('morgan');
+const cors = require('cors');
 
-// Create express app
-var app = express();
+// --- Import API Routes ---
+const bookRouter = require('./routes/bookRoutes');
+const productRouter = require('./routes/productRoutes');
+const userRouter = require('./routes/userRoutes');
+const authRouter = require('./routes/authRoutes');
+const paymentRouter = require('./routes/paymentRoutes'); 
+const campaignRouter = require("./routes/campaignRoutes")
 
-// ===== View engine setup =====
-app.set("views", path.join(__dirname, "views")); // Folder for EJS templates
-app.set("view engine", "ejs"); // Using EJS as the template engine
+const app = express();
 
-// ===== Middlewares =====
-app.use(logger("dev")); // Logs requests (method, status, time, etc.)
+// --- View Engine Setup ---
+app.set('views', path.join(__dirname, 'views'));
+app.set('view engine', 'ejs');
+
+// --- Core Middlewares ---
+app.use(logger('dev'));
 app.use(express.json()); // Parse JSON request bodies
-app.use(express.urlencoded({ extended: false })); // Parse URL-encoded data (like form inputs)
-app.use(cookieParser()); // Parse cookies sent by client
-app.use(express.static(path.join(__dirname, "public"))); // Serve static files (CSS, JS, images)
+app.use(express.urlencoded({ extended: false })); // Parse URL-encoded form data
+app.use(cookieParser());
+app.use(express.static(path.join(__dirname, 'public'))); // Serve static files
 
-// ===== CORS setup =====
-const cors = require("cors");
+// --- CORS Setup ---
 const corsOptions = {
-  origin: "*", // Allow requests from any origin (can restrict later)
-  credientials: true, // (Typo: should be 'credentials')
-  optionSuccessStatus: 200, // For legacy browsers that choke on 204
+  origin: '*', // For development. Restrict this in production.
+  credentials: true,
+  optionSuccessStatus: 200,
 };
-app.use(cors(corsOptions)); // Enable CORS with the options above
+app.use(cors(corsOptions));
 
-// ===== Route handling =====
-// Attach routers to specific paths
-app.use("/users", usersRouter); // Handles routes under /users
-app.use("/api/products", productRouter); // Handles routes under /api/products
-app.use("/api/books", bookRouter); // Handles routes under /api/books
-app.use("/api/users", userRouter); // Handles routes under /api/users
-app.use("/api/auth", authRouter); // Handles routes under /api/users
+// --- API Route Handling ---
+// All API routes are prefixed with /api
+app.use('/api/products', productRouter);
+app.use('/api/books', bookRouter);
+app.use('/api/users', userRouter);
+app.use('/api/auth', authRouter);
+app.use('/api/payments', paymentRouter); 
+app,use("/api/campaigns", campaignRouter);
 
-// ===== 404 Error handling =====
-// If no route matches, this will create a 404 error and forward it
+// --- 404 Error Handler ---
+// Catches requests that don't match any of the routes above
 app.use(function (req, res, next) {
   next(createError(404));
 });
 
-// ===== General error handler =====
+// --- General Error Handler ---
 app.use(function (err, req, res, next) {
-  // Pass the error message and stack (only in development)
+  // Set locals, only providing error in development
   res.locals.message = err.message;
-  res.locals.error = req.app.get("env") === "development" ? err : {};
+  res.locals.error = req.app.get('env') === 'development' ? err : {};
 
-  // Set response status and render the error page
+  // Render the error page
   res.status(err.status || 500);
-  res.render("error");
+  res.render('error');
 });
 
-// Export the app so it can be used in another file (like server.js)
 module.exports = app;
