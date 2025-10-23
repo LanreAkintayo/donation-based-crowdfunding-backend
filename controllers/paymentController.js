@@ -64,7 +64,11 @@ exports.verifyTransaction = async (req, res) => {
     const { reference } = req.params;
     const response = await paystackApi.get(`/transaction/verify/${reference}`);
     const { status, amount, customer, metadata } = response.data.data;
-    const { campaignId, isAnonymous } = metadata;
+    const { campaignDbId, campaignId, isAnonymous } = metadata;
+
+    console.log("CampaignId from metadata: ", campaignId);
+    console.log("CampaignDbId from metadata: ", campaignDbId);
+    console.log("Is anonymous: ", isAnonymous);
 
     // Check if the transaction was successful
     if (status !== "success") {
@@ -99,7 +103,8 @@ exports.verifyTransaction = async (req, res) => {
 
     // Create the donation record
     await Donation.create({
-      campaign: campaignId,
+      campaignDbId: campaignDbId,
+      campaignId: campaignId,
       donorEmail: customer.email,
       amount: amount, // Amount is already in Kobo from paystack
       paystackReference: reference,
@@ -107,9 +112,12 @@ exports.verifyTransaction = async (req, res) => {
     });
 
     // Update the campaigns' total amount raised
-    await Campaign.findByIdAndUpdate(campaignId, {
-      $inc: { amountRaised: amount },
-    });
+    await Campaign.findOneAndUpdate(
+      { campaignId: campaignId },
+      {
+        $inc: { amountRaised: amount },
+      }
+    );
 
     console.log(
       `Donation of ${amount / 100} NGN by ${
@@ -178,22 +186,31 @@ exports.getBankList = async (req, res) => {
     const response = await axios.get("https://api.paystack.co/bank");
     res.status(200).json(response.data.data);
   } catch (error) {
+    console.error("error: ", error);
     res.status(500).json({ status: "error", message: "Could not fetch banks" });
   }
 };
-
 
 exports.resolveAccount = async (req, res) => {
   try {
     const { accountNumber, bankCode } = req.body;
 
-    // Use the global paystackApi instance you already have
     const response = await paystackApi.get(
       `/bank/resolve?account_number=${accountNumber}&bank_code=${bankCode}`
     );
 
     res.status(200).json(response.data);
   } catch (error) {
-    res.status(400).json({ status: 'error', message: 'Account details could not be resolved.' });
+    console.error(
+      "Resolve account error:",
+      error.response?.data || error.message
+    );
+
+    const statusCode = error.response ? error.response.status : 500;
+    const message = error.response
+      ? error.response.data.message
+      : "Account details could not be resolved.";
+
+    res.status(statusCode).json({ status: "error", message: message });
   }
 };

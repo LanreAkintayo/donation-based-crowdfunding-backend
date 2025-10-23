@@ -4,7 +4,8 @@ const {
     createSubaccount, 
     verifyTransaction, 
     triggerPayout ,
-    getBankList
+    getBankList,
+    resolveAccount
 } = require('../controllers/paymentController');
 const { protect } = require('../middleware/authMiddleware');
 

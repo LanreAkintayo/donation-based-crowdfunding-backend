@@ -44,7 +44,7 @@ app.use('/api/books', bookRouter);
 app.use('/api/users', userRouter);
 app.use('/api/auth', authRouter);
 app.use('/api/payments', paymentRouter); 
-app,use("/api/campaigns", campaignRouter);
+app.use("/api/campaigns", campaignRouter);
 
 // --- 404 Error Handler ---
 // Catches requests that don't match any of the routes above

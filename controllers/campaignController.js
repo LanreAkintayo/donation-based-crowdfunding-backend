@@ -24,17 +24,33 @@ exports.createCampaign = async (req, res) => {
 
     // Get the logged-in user's ID
     const userId = req.user.id;
+    const userFullName = req.user.fullName;
+
+    if (!userFullName) {
+      return res
+        .status(400)
+        .json({ status: "error", message: "User name not found." });
+    }
+
+    // console.log("User full name: ", userFullName);
+    // console.log("Bank code: ", bankCode);
+    // console.log("Account number: ", accountNumber);
 
     // Call Paystack to create the subaccount
     const response = await paystackApi.post("/subaccount", {
-      business_name: title,
+      business_name: userFullName,
       bank_code: bankCode,
       account_number: accountNumber,
       settlement_schedule: "manual", // 'manual' holds all funds until a payout is triggered.
       percentage_charge: 0, // This is the platform fee.
     });
 
-    const { subaccount_code, bank_name } = response.data.data;
+    // console.log("Response: ", response)
+
+    const { subaccount_code, settlement_bank } = response.data.data;
+
+    // console.log("subaccount_code: ", subaccount_code);
+    // console.log("bank_name: ", bank_name);
 
     // Create the campaign in the database
     const newCampaign = await Campaign.create({
@@ -43,7 +59,7 @@ exports.createCampaign = async (req, res) => {
       description,
       goalAmount: goalAmount * 100,
       subaccountCode: subaccount_code,
-      bankName: bank_name,
+      bankName: settlement_bank,
       accountNumber,
     });
 
@@ -53,11 +69,18 @@ exports.createCampaign = async (req, res) => {
       data: newCampaign,
     });
   } catch (error) {
-    console.error(
-      "Error creating campaign:",
-      error.response?.data || error.message
-    );
-    // Handle Paystack or Database errors
+    const paystackError = error.response?.data;
+    console.error("Error creating campaign:", paystackError || error.message);
+
+    // Send Paystack's actual error message and status code back
+    if (paystackError) {
+      return res.status(error.response.status).json({
+        status: "error",
+        message: paystackError.message || "An error occurred with Paystack.",
+      });
+    }
+
+    // Handle other (e.g., database) errors
     res.status(500).json({
       status: "error",
       message: "An error occurred while creating the campaign.",
@@ -94,10 +117,10 @@ exports.getAllCampaigns = async (req, res) => {
  */
 exports.getCampaignById = async (req, res) => {
   try {
-    const campaign = await Campaign.findById(req.params.id).populate(
-      "user",
-      "fullName username"
-    );
+    const campaignId = req.params.id;
+    const campaign = await Campaign.findOne({
+      campaignId: campaignId,
+    }).populate("user", "fullName username");
 
     if (!campaign) {
       return res
@@ -110,6 +133,7 @@ exports.getCampaignById = async (req, res) => {
       data: campaign,
     });
   } catch (error) {
+    console.error("Error fetching campaign by ID:", error.message);
     res.status(500).json({ status: "error", message: "Server error" });
   }
 };
@@ -147,3 +171,25 @@ exports.activateCampaign = async (req, res) => {
     res.status(500).json({ status: "error", message: "Server error" });
   }
 };
+
+
+/**
+ * @desc    Get all Naira donations for a specific campaign
+ * @route   GET /api/campaigns/:id/donations
+ * @access  Public
+ */
+exports.getCampaignDonations = async (req, res) => {
+    try {
+        const campaignId = req.params.id;
+
+        const donations = await Donation.find({ campaignId: campaignId }).sort({ createdAt: -1 });
+
+        res.status(200).json({
+            status: "success",
+            count: donations.length,
+            data: donations,
+        });
+    } catch (error) {
+        res.status(500).json({ status: "error", message: "Server error" });
+    }
+}

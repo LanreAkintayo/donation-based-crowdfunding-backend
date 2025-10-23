@@ -3,7 +3,9 @@ const router = express.Router();
 const {
     createCampaign,
     getAllCampaigns,
-    getCampaignById
+    getCampaignById,
+    activateCampaign,
+    getCampaignDonations
 } = require('../controllers/campaignController');
 const { protect } = require('../middleware/authMiddleware');
 
@@ -34,5 +36,8 @@ router.get('/:id', getCampaignById);
  * @access  Private
  */
 router.patch("/:id/activate", protect, activateCampaign);
+
+
+router.get("/:id/donations", getCampaignDonations);
 
 module.exports = router;

@@ -39,7 +39,7 @@ router.post("/login", async (req, res) => {
     jwt.sign(
       payload,
       process.env.JWT_SECRET,
-      { expiresIn: "1h" }, // Token expires in 1 hour
+      { expiresIn: "24h" }, // Token expires in 1 hour
       (err, token) => {
         if (err) throw err;
         res.status(200).json({

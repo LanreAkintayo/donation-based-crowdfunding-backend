@@ -3,9 +3,14 @@ const Schema = mongoose.Schema;
 
 const donationSchema = new Schema(
   {
-    campaign: {
+    campaignDbId: {
       type: Schema.Types.ObjectId,
       ref: "Campaign",
+      required: true,
+    },
+
+    campaignId: {
+      type: Number,
       required: true,
     },
 
@@ -16,8 +21,8 @@ const donationSchema = new Schema(
     },
     donorUserName: {
       type: String,
-      required: true,
       trim: true,
+      default: null,
     },
     amount: {
       type: Number, // Stored in Kobo
