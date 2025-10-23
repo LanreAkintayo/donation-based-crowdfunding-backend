@@ -19,7 +19,7 @@ const donationSchema = new Schema(
       required: true,
       trim: true,
     },
-    donorUserName: {
+    donorDisplayName: {
       type: String,
       trim: true,
       default: null,

@@ -64,7 +64,7 @@ exports.verifyTransaction = async (req, res) => {
     const { reference } = req.params;
     const response = await paystackApi.get(`/transaction/verify/${reference}`);
     const { status, amount, customer, metadata } = response.data.data;
-    const { campaignDbId, campaignId, isAnonymous } = metadata;
+    const { campaignDbId, campaignId, isAnonymous, displayName } = metadata;
 
     console.log("CampaignId from metadata: ", campaignId);
     console.log("CampaignDbId from metadata: ", campaignDbId);
@@ -106,6 +106,7 @@ exports.verifyTransaction = async (req, res) => {
       campaignDbId: campaignDbId,
       campaignId: campaignId,
       donorEmail: customer.email,
+      donorDisplayName: displayName,
       amount: amount, // Amount is already in Kobo from paystack
       paystackReference: reference,
       isAnonymous: isAnonymous,
