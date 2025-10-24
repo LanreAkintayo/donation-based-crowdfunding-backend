@@ -149,19 +149,35 @@ exports.verifyTransaction = async (req, res) => {
  */
 exports.triggerPayout = async (req, res) => {
   try {
+    const { campaignId } = req.params;
     const userId = req.user.id;
-    const user = await User.findById(userId);
 
-    if (!user || !user.subaccountCode) {
-      return res.status(400).json({
+    const campaign = await Campaign.findOne({ campaignId: campaignId });
+
+    // Validate payout
+    if (!campaign) {
+      return res.status(404).json({
         status: "error",
-        message: "User has no subaccount configured for payout.",
+        message: "Campaign not found.",
       });
     }
 
-    // To trigger a payout, we simply update the subaccount's settlement schedule to daily.
-    // Paystack will then process all accumulated funds in the next settlement window.
-    await paystackApi.put(`/subaccount/${user.subaccountCode}`, {
+    if (campaign.user.toString() !== userId) {
+      return res.status(403).json({
+        status: "error",
+        message: "You are not authorized to initiate payout for this campaign.",
+      });
+    }
+
+    if (!campaign.subaccountCode) {
+      return res.status(400).json({
+        status: "error",
+        message: "Campaign has no subaccount configured for payout.",
+      });
+    }
+
+    // Trigger payout
+    await paystackApi.put(`/subaccount/${campaign.subaccountCode}`, {
       settlement_schedule: "daily",
     });
 
@@ -171,10 +187,19 @@ exports.triggerPayout = async (req, res) => {
         "Payout has been initiated. Funds will be settled to your account shortly.",
     });
   } catch (error) {
-    console.error(
-      "Error triggering payout:",
-      error.response?.data || error.message
-    );
+    console.error("Error triggering payout:", error);
+    
+    const paystackError = error.response?.data;
+    console.error("Error triggering payout:", paystackError || error.message);
+
+    if (paystackError) {
+      return res.status(error.response.status).json({
+        status: "error",
+        message:
+          paystackError.message ||
+          "An error occurred with Paystack during payout.",
+      });
+    }
     res.status(500).json({
       status: "error",
       message: "An error occurred while initiating the payout.",

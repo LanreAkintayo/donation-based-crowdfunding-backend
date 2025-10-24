@@ -34,4 +34,11 @@ router.get("/banks", getBankList);
 
 router.post('/resolve', protect, resolveAccount);
 
+/**
+ * @route   POST /api/payments/payout/:campaignId
+ * @desc    Initiate Naira payout for a specific campaign
+ * @access  Private
+ */
+router.post('/payout/:campaignId', protect, triggerPayout);
+
 module.exports = router;
