@@ -2,6 +2,8 @@ const axios = require("axios");
 const User = require("../models/userModel");
 const Campaign = require("../models/campaignModel");
 const Donation = require("../models/donationModel");
+const { sendPayoutNotification } = require('../utils/emailSender');
+
 
 const paystackApi = axios.create({
   baseURL: "https://api.paystack.co",
@@ -153,6 +155,7 @@ exports.triggerPayout = async (req, res) => {
     const userId = req.user.id;
 
     const campaign = await Campaign.findOne({ campaignId: campaignId });
+    const user = await User.findOne({ _id: userId });
 
     // Validate payout
     if (!campaign) {
@@ -162,12 +165,16 @@ exports.triggerPayout = async (req, res) => {
       });
     }
 
+    console.log("Campaign found: ", campaign);
+
     if (campaign.user.toString() !== userId) {
       return res.status(403).json({
         status: "error",
         message: "You are not authorized to initiate payout for this campaign.",
       });
     }
+
+    console.log("User authorized for payout.");
 
     if (!campaign.subaccountCode) {
       return res.status(400).json({
@@ -176,16 +183,35 @@ exports.triggerPayout = async (req, res) => {
       });
     }
 
+    console.log("Subaccount code found: ", campaign.subaccountCode);
+
     // Trigger payout
     await paystackApi.put(`/subaccount/${campaign.subaccountCode}`, {
-      settlement_schedule: "daily",
+      settlement_schedule: "auto",
     });
+
+    console.log("User: ", user)
+
+    // Send notification email to the campaign creator
+    try {
+      await sendPayoutNotification(
+          user.email, 
+          user.fullName, 
+          campaign.title,
+          campaign.amountRaised
+      );
+    } catch (emailError) {
+      // Log email error but don't stop the success response
+      console.error(`Payout initiated for ${campaign.subaccountCode}, but notification email failed.`);
+    }
 
     res.status(200).json({
       status: "success",
       message:
         "Payout has been initiated. Funds will be settled to your account shortly.",
     });
+
+    console.log("Payout triggered successfully.");
   } catch (error) {
     console.error("Error triggering payout:", error);
     
