@@ -2,6 +2,7 @@ const express = require("express");
 const router = express.Router();
 const User = require("../models/userModel"); // Import the User model
 const bcrypt = require("bcrypt");
+const { protect } = require('../middleware/authMiddleware');
 
 // POST route to add a new user
 router.post("/add-user", async (req, res) => {
@@ -59,6 +60,16 @@ router.get("/all-users", async (req, res) => {
     console.error(error);
     res.status(500).json({ message: "Server Error" });
   }
+});
+
+
+// @desc    Get current user data
+// @route   GET /api/users/me
+// @access  Private
+router.get("/me", protect, (req, res) => {
+    // We don't need to find user again. 'protect' already did it!
+    // We just send back what 'protect' found.
+    res.status(200).json(req.user);
 });
 
 module.exports = router;
