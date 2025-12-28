@@ -25,8 +25,6 @@ const campaignSchema = new Schema(
       type: Number,
       default: 0,
     },
-
-    // --- Payout & Subaccount Details ---
     subaccountCode: {
       type: String,
       required: [true, "Paystack subaccount code is required"],
@@ -48,6 +46,21 @@ const campaignSchema = new Schema(
     campaignId: {
       type: Number,
       default: null,
+    },
+    evidence: [
+      {
+        name: { type: String }, 
+        url: { type: String, required: true }, 
+        type: { type: String }, 
+      }
+    ],
+    deadline: {
+      type: Date,
+      required: [true, "Please provide a deadline"],
+    },
+    image: {
+      type: String,
+      required: [true, "Please provide a cover image"], 
     },
   },
   { timestamps: true }
