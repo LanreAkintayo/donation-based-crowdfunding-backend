@@ -1,5 +1,5 @@
 {
-  "name": "vercel-express-online-demo",
+  "name": "donation-based-crowdfunding-platform",
   "version": "0.0.0",
   "private": true,
   "scripts": {
